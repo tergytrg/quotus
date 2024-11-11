@@ -2,6 +2,57 @@ import './style.css';
 
 let currentQuote = null;
 let startTime = Date.now();
+let score = 0;
+let player = "";
+
+async function updateScoreboard() {
+    try {
+        const response = await fetch('http://localhost:3001/update_score', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name: player,
+                score: score,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log(data);
+        const scoreList = document.querySelector('#score-list');
+        scoreList.innerHTML = '';
+        data.forEach(([player, score]) => {
+          const listItem = document.createElement('li');
+          listItem.textContent = `${player}: ${score}`;
+          scoreList.appendChild(listItem);
+        });
+    } catch (error) {
+        document.querySelector('#score-list').innerHTML = `<p>Cannot update scoreboard :(</p>`;
+        console.error('Error updating scoreboard: ', error);
+    }
+}
+
+async function resetScore() {
+    try {
+        const response = await fetch('http://localhost:3001/reset_score', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.statusText}`);
+        }
+    } catch (error) {
+        console.error('Error updating scoreboard: ', error);
+    }
+}
 
 async function getRandomQuotes() {
     try {
@@ -70,6 +121,9 @@ async function mainLoop() {
         });
     });
     function displayAnswerFeedback() {
+        if (selectedIndex === correctIndex) {
+                score += 1;
+        }
         document.querySelectorAll('#options button').forEach((button, index) => {
             // Always highlight the correct answer in green
             if (index === correctIndex) {
@@ -92,9 +146,8 @@ async function mainLoop() {
 document.getElementById("start-game-button").addEventListener("click", function() {
     // Get the player's name from the input field
     const playerName = document.getElementById("player-name").value;
-
     if (playerName.trim() !== "") {
-        // Hide the menu view and show the game view
+        player = playerName;
         document.getElementById("menu-view").style.display = "none";
         document.getElementById("slider-container").style.display = "flex";
         document.getElementById("app").style.display = "block";
@@ -115,5 +168,6 @@ document.getElementById("leave-game-button").addEventListener("click", function(
 });
 
 // Call the function to fetch and display a random quote and non-quotes
-setInterval(mainLoop, 1000);
 setInterval(updateTime, 10);
+setInterval(updateScoreboard, 100);
+setInterval(mainLoop, 1000);

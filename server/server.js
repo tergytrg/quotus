@@ -82,10 +82,30 @@ app.get("/start_time", async (req, res) => {
   res.json(startTime);
 });
 
+const scoreboard = new Map();
+app.get("/scoreboard", async (req, res) => {
+  res.json(scoreboard);
+});
+
+app.post("/update_score", async (req, res) => {
+  const { name, score } = req.body;
+  if (!name || score === undefined) {
+    return res.status(400).json({ error: "Please provide both name and score." });
+  }
+  //scoreboard.
+  scoreboard.set(name, score);
+  const sortedScoreboard = [...scoreboard.entries()]
+    .sort((a, b) => b[1] - a[1]);
+  res.json(sortedScoreboard);
+});
+
+app.delete("/reset_score", async (req, res) => {
+  scoreboard.clear();
+});
 
 // POST REQUESTS ==============================================//
 app.post("/api/token", async (req, res) => {
-  
+
   // Exchange the code for an access_token
   const response = await fetch(`https://discord.com/api/oauth2/token`, {
     method: "POST",
