@@ -95,7 +95,6 @@ async function mainLoop() {
         return;
     }
     await updateStartTime();
-    await updateScoreboard();
     currentQuote = randomQuote;
 
     let correctIndex = -1;
@@ -124,7 +123,6 @@ async function mainLoop() {
     function displayAnswerFeedback() {
         if (selectedIndex === correctIndex) {
                 score += 1;
-                updateScoreboard();
         }
         document.querySelectorAll('#options button').forEach((button, index) => {
             // Always highlight the correct answer in green
@@ -155,7 +153,6 @@ document.getElementById("start-game-button").addEventListener("click", function(
         document.getElementById("app").style.display = "block";
         document.getElementById("app-menu").style.display = "block";
         document.getElementById("scoreboard").style.display = "block";
-        updateScoreboard();
     } else {
         alert("Please enter your name to start the game.");
     }
@@ -171,5 +168,6 @@ document.getElementById("leave-game-button").addEventListener("click", function(
 });
 
 // Call the function to fetch and display a random quote and non-quotes
-setInterval(mainLoop, 1000);
 setInterval(updateTime, 10);
+setInterval(updateScoreboard, 100);
+setInterval(mainLoop, 1000);
