@@ -1,87 +1,106 @@
 import './style.css';
+// import { Api } from './api.js';
 
 let currentQuote = null;
 let startTime = Date.now();
 let score = 0;
 let player = "";
+let localGameStatus = false;
+
+class Api {
+    constructor(serverUrl = "http://localhost:3001") {
+        this.SERVER_URL = serverUrl;
+    }
+
+    async updateScoreboard(player, score) {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/update_score`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: player, score: score }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            document.querySelector('#score-list').innerHTML = `<p>Cannot update scoreboard :(</p>`;
+            console.error('Error updating scoreboard: ', error);
+        }
+    }
+
+    async resetScore() {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/reset_score`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Error resetting scoreboard: ', error);
+        }
+    }
+
+    async getGameStatus() {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/game_status`);
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching game status: ', error);
+        }
+    }
+
+    async getRandomQuotes() {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/random_quotes`);
+            const data = await response.json();
+            const randomQuote = data[0];
+            const allOptions = data[1];
+            return [randomQuote, allOptions];
+        } catch (error) {
+            document.querySelector('#app').innerHTML = `<p>Connection to server lost :(</p>`;
+            console.error('Error fetching quotes: ', error);
+        }
+    }
+
+    async getStartTime() {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/start_time`);
+            return await response.json();
+        } catch (error) {
+            console.error('Error getting start time: ', error);
+        }
+    }
+}
+
+
+const api = new Api("http://localhost:3001");
 
 async function updateScoreboard() {
-    try {
-        const response = await fetch('http://localhost:3001/update_score', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                name: player,
-                score: score,
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Server error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log(data);
-        const scoreList = document.querySelector('#score-list');
-        scoreList.innerHTML = '';
-        data.forEach(([player, score]) => {
-          const listItem = document.createElement('li');
-          listItem.textContent = `${player}: ${score} punten`;
-          scoreList.appendChild(listItem);
-        });
-    } catch (error) {
-        document.querySelector('#score-list').innerHTML = `<p>Cannot update scoreboard :(</p>`;
-        console.error('Error updating scoreboard: ', error);
-    }
-}
-
-async function resetScore() {
-    try {
-        const response = await fetch('http://localhost:3001/reset_score', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error(`Server error: ${response.statusText}`);
-        }
-    } catch (error) {
-        console.error('Error updating scoreboard: ', error);
-    }
-}
-
-async function getRandomQuotes() {
-    try {
-        // Make the request to the server
-        const response = await fetch('http://localhost:3001/random_quotes');
-        const data = await response.json();
-        // Access the first array from the response
-        const randomQuote = data[0];  // First part contains the quotes
-        const allOptions = data[1];   // Second part contains the names
-        return [randomQuote, allOptions];
-    } catch (error) {
-        document.querySelector('#app').innerHTML = `<p>Connection to server lost :(</p>`;
-        console.error('Error fetching quotes: ', error);
-    }
+    const data = await api.updateScoreboard(player, score);
+    const scoreList = document.querySelector('#score-list');
+    scoreList.innerHTML = '';
+    data.forEach(([player, score]) => {
+      const listItem = document.createElement('li');
+      listItem.textContent = `${player}: ${score} punten`;
+      scoreList.appendChild(listItem);
+    });
 }
 
 async function updateStartTime() {
-    try {
-        // Make the request to the server
-        const response = await fetch('http://localhost:3001/start_time');
-
-        const data = await response.json();
-        startTime = data;
-    } catch (error) {
-        console.error('Error getting time: ', error);
-    }
+    startTime = await api.getStartTime();
 }
 
-function updateTime() {
+function updateRemainingTime() {
     const elapsedTime = Date.now() - startTime;
     const remainingTime = 10000 - elapsedTime;
     const percentage = Math.max(0, (remainingTime / 10000) * 100);
@@ -90,7 +109,11 @@ function updateTime() {
 
 // Function to fetch and parse the output.ini file
 async function mainLoop() {
-    const [randomQuote, allOptions] = await getRandomQuotes();
+    const gameStarted = await api.getGameStatus();
+    if (!gameStarted) {
+        return;
+    }
+    const [randomQuote, allOptions] = await api.getRandomQuotes();
     if (currentQuote != null && randomQuote.quote === currentQuote.quote) {
         return;
     }
@@ -176,6 +199,6 @@ document.getElementById("leave-game-button").addEventListener("click", function(
 });
 
 // Call the function to fetch and display a random quote and non-quotes
-setInterval(updateTime, 10);
+setInterval(updateRemainingTime, 10);
 setInterval(updateScoreboard, 100);
 setInterval(mainLoop, 1000);

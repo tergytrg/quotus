@@ -41,6 +41,8 @@ const quotes = outputLines.map(line => {
 let randomQuote = null;
 let allOptions = null;
 let startTime = Date.now();
+let gameStarted = false;
+let round = 0;
 
 function pickNewRandomQuote() {
   // Pick a random quote and non-quote combination from output.ini
@@ -85,6 +87,15 @@ app.get("/start_time", async (req, res) => {
 const scoreboard = new Map();
 app.get("/scoreboard", async (req, res) => {
   res.json(scoreboard);
+});
+
+app.get("/game_status", async (req, res) => {
+  res.json(gameStarted);
+});
+
+app.post("/start", async (req, res) => {
+    gameStarted = true;
+    res.json(gameStarted);
 });
 
 app.post("/update_score", async (req, res) => {
