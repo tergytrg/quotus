@@ -28,7 +28,7 @@ async function updateScoreboard() {
         scoreList.innerHTML = '';
         data.forEach(([player, score]) => {
           const listItem = document.createElement('li');
-          listItem.textContent = `${player}: ${score}`;
+          listItem.textContent = `${player}: ${score} punten`;
           scoreList.appendChild(listItem);
         });
     } catch (error) {
@@ -143,19 +143,27 @@ async function mainLoop() {
     setTimeout(displayAnswerFeedback, remainingTime);
 }
 
-document.getElementById("start-game-button").addEventListener("click", function() {
+document.getElementById("join-game-button").addEventListener("click", function() {
     // Get the player's name from the input field
     const playerName = document.getElementById("player-name").value;
     if (playerName.trim() !== "") {
         player = playerName;
         document.getElementById("menu-view").style.display = "none";
+        document.getElementById("app-menu").style.display = "block";
+        document.getElementById("scoreboard").style.display = "block";
+        document.getElementById("lobby").style.display = "block";
+    } else {
+        alert("Please enter your name to start the game.");
+    }
+});
+
+document.getElementById("start-game-button").addEventListener("click", function() {
+        document.getElementById("lobby").style.display = "none";
+        document.getElementById("menu-view").style.display = "none";
         document.getElementById("slider-container").style.display = "flex";
         document.getElementById("app").style.display = "block";
         document.getElementById("app-menu").style.display = "block";
         document.getElementById("scoreboard").style.display = "block";
-    } else {
-        alert("Please enter your name to start the game.");
-    }
 });
 
 document.getElementById("leave-game-button").addEventListener("click", function() {
