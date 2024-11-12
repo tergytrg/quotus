@@ -20,7 +20,7 @@ class Api {
     }
 
     setServerUrl(serverUrl) {
-        this.SERVER_URL = serverUrl;
+        this.SERVER_URL = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;;
     }
 
     async updateScoreboard(player, score) {
