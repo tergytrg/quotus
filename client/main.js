@@ -19,6 +19,10 @@ class Api {
         this.SERVER_URL = serverUrl;
     }
 
+    setServerUrl(serverUrl) {
+        this.SERVER_URL = serverUrl;
+    }
+
     async updateScoreboard(player, score) {
         try {
             const response = await fetch(`${this.SERVER_URL}/update_score`, {
@@ -203,8 +207,10 @@ function enableLobbyView() {
 document.getElementById("join-game-button").addEventListener("click", function() {
     // Get the player's name from the input field
     const playerName = document.getElementById("player-name").value;
+    const serverURL = document.getElementById("server-url").value;
     if (playerName.trim() !== "") {
         player = playerName;
+        api.setServerUrl(serverURL);
         enableLobbyView();
     } else {
         alert("Please enter your name to start the game.");
