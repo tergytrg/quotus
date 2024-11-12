@@ -1,11 +1,18 @@
 import './style.css';
-// import { Api } from './api.js';
+//import './api.js';
 
 let currentQuote = null;
 let startTime = Date.now();
 let score = 0;
 let player = "";
-let localGameStatus = false;
+
+const View = {
+  Menu: 0,
+  Lobby: 1,
+  Game: 2
+};
+
+let view = View.Menu;
 
 class Api {
     constructor(serverUrl = "http://localhost:3001") {
@@ -33,29 +40,30 @@ class Api {
         }
     }
 
-    async resetScore() {
-        try {
-            const response = await fetch(`${this.SERVER_URL}/reset_score`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error('Error resetting scoreboard: ', error);
-        }
-    }
-
     async getGameStatus() {
         try {
             const response = await fetch(`${this.SERVER_URL}/game_status`);
             return await response.json();
         } catch (error) {
             console.error('Error fetching game status: ', error);
+        }
+    }
+
+    async startGame(amountOfRounds, roundLength) {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ amountOfRounds: amountOfRounds, roundLength: roundLength }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Error starting game: ', error);
         }
     }
 
@@ -82,10 +90,12 @@ class Api {
     }
 }
 
-
 const api = new Api("http://localhost:3001");
 
 async function updateScoreboard() {
+    if (player === "") {
+        return;
+    }
     const data = await api.updateScoreboard(player, score);
     const scoreList = document.querySelector('#score-list');
     scoreList.innerHTML = '';
@@ -111,7 +121,14 @@ function updateRemainingTime() {
 async function mainLoop() {
     const gameStarted = await api.getGameStatus();
     if (!gameStarted) {
+        if (view === View.Game) {
+            enableLobbyView();
+        }
         return;
+    } else if (view === View.Menu) {
+        return;
+    } else if (view === View.Lobby) {
+        enableGameView();
     }
     const [randomQuote, allOptions] = await api.getRandomQuotes();
     if (currentQuote != null && randomQuote.quote === currentQuote.quote) {
@@ -166,36 +183,56 @@ async function mainLoop() {
     setTimeout(displayAnswerFeedback, remainingTime);
 }
 
+function clearView() {
+    document.getElementById("app-menu").style.display = "none";
+    document.getElementById("scoreboard").style.display = "none";
+    document.getElementById("lobby").style.display = "none";
+    document.getElementById("slider-container").style.display = "none";
+    document.getElementById("app").style.display = "none";
+    document.getElementById("menu-view").style.display = "none";
+}
+
+function enableLobbyView() {
+    clearView();
+    view = View.Lobby;
+    document.getElementById("app-menu").style.display = "block";
+    document.getElementById("scoreboard").style.display = "block";
+    document.getElementById("lobby").style.display = "block";
+}
+
 document.getElementById("join-game-button").addEventListener("click", function() {
     // Get the player's name from the input field
     const playerName = document.getElementById("player-name").value;
     if (playerName.trim() !== "") {
         player = playerName;
-        document.getElementById("menu-view").style.display = "none";
-        document.getElementById("app-menu").style.display = "block";
-        document.getElementById("scoreboard").style.display = "block";
-        document.getElementById("lobby").style.display = "block";
+        enableLobbyView();
     } else {
         alert("Please enter your name to start the game.");
     }
 });
 
+function enableGameView() {
+    clearView();
+    view = View.Game;
+    document.getElementById("slider-container").style.display = "flex";
+    document.getElementById("app").style.display = "block";
+    document.getElementById("app-menu").style.display = "block";
+    document.getElementById("scoreboard").style.display = "block";
+}
+
 document.getElementById("start-game-button").addEventListener("click", function() {
-        document.getElementById("lobby").style.display = "none";
-        document.getElementById("menu-view").style.display = "none";
-        document.getElementById("slider-container").style.display = "flex";
-        document.getElementById("app").style.display = "block";
-        document.getElementById("app-menu").style.display = "block";
-        document.getElementById("scoreboard").style.display = "block";
+    api.startGame(5, 12000);
 });
 
-document.getElementById("leave-game-button").addEventListener("click", function() {
-    // Hide the menu view and show the game view
+function enableMenuView() {
+    clearView();
+    view = View.Menu;
     document.getElementById("menu-view").style.display = "block";
-    document.getElementById("slider-container").style.display = "none";
-    document.getElementById("app").style.display = "none";
-    document.getElementById("app-menu").style.display = "none";
-    document.getElementById("scoreboard").style.display = "none";
+}
+
+document.getElementById("leave-game-button").addEventListener("click", function() {
+    score = 0;
+    enableMenuView()
 });
 
 // Call the function to fetch and display a random quote and non-quotes

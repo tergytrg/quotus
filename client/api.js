@@ -1,4 +1,4 @@
-export class Api {
+export default class Api {
     constructor(serverUrl = "http://localhost:3001") {
         this.SERVER_URL = serverUrl;
     }
