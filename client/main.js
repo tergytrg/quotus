@@ -1,103 +1,247 @@
 import './style.css';
-import platoFoto from '/plato.png';
+//import './api.js';
 
-// Function to fetch and parse the output.ini file
-async function fetchQuotes() {
-    try {
-        // Fetch both the output.ini and nonquoted.txt files
-        const [outputResponse, nonQuotedResponse] = await Promise.all([
-            fetch('/parsed-quotes.ini'),    // Path to output.ini
-            fetch('/nonquoted.txt')  // Path to nonquoted.txt
-        ]);
+let currentQuote = null;
+let startTime = Date.now();
+let score = 0;
+let player = "";
 
-        const outputData = await outputResponse.text();
-        const nonQuotedData = await nonQuotedResponse.text();
+const View = {
+  Menu: 0,
+  Lobby: 1,
+  Game: 2
+};
 
-        // Split the files into lines
-        const outputLines = outputData.split('\n').filter(line => line.trim() !== '');
-        const nonQuotedLines = nonQuotedData.split('\n').filter(line => line.trim() !== '');
+let view = View.Menu;
 
-        // Extract non-quoted and quoted parts from output.ini
-        const quotesArray = outputLines.map(line => {
-            const nonQuoteMatch = line.match(/\[(.*?)\]/); // Match text inside square brackets
-            const quoteMatch = line.match(/"(.*?)"/); // Match text inside quotes
+class Api {
+    constructor(serverUrl = "http://localhost:3001") {
+        this.SERVER_URL = serverUrl;
+    }
 
-            if (nonQuoteMatch && quoteMatch) {
-                return {
-                    nonQuote: nonQuoteMatch[1],
-                    quote: quoteMatch[1]
-                };
-            }
-            return null;
-        }).filter(item => item !== null); // Filter out null values
+    setServerUrl(serverUrl) {
+        this.SERVER_URL = serverUrl;
+    }
 
-        // Pick a random quote and non-quote combination from output.ini
-        const randomQuoteIndex = Math.floor(Math.random() * quotesArray.length);
-        const randomQuote = quotesArray[randomQuoteIndex];
-
-        // Pick 3 random incorrect non-quotes from nonquoted.txt
-        const incorrectNonQuotes = [];
-        while (incorrectNonQuotes.length < 5) {
-            const randomIndex = Math.floor(Math.random() * nonQuotedLines.length);
-            const nonQuote = nonQuotedLines[randomIndex];
-
-            // Ensure the incorrect non-quote isn't the correct one and isn't already selected
-            if (nonQuote !== randomQuote.nonQuote && !incorrectNonQuotes.includes(nonQuote)) {
-                incorrectNonQuotes.push(nonQuote);
-            }
-        }
-
-        // Combine the correct non-quote with the incorrect ones
-        const allOptions = [...incorrectNonQuotes];
-
-        // Insert the correct answer at a random position
-        const randomPosition = Math.floor(Math.random() * (incorrectNonQuotes.length + 1));
-        allOptions.splice(randomPosition, 0, randomQuote.nonQuote);
-
-        // Display the random quote and non-quotes in the HTML
-        document.querySelector('#app').innerHTML = `
-      <div>
-        <img src="${platoFoto}" class="logo" alt="Plato" />
-        <h2>"${randomQuote.quote}"</h2>
-        <ul id="options">
-          ${allOptions.map((option, index) => `<li><button data-answer="${option === randomQuote.nonQuote}" id="option-${index}">${option}</button></li>`).join('')}
-        </ul>
-        <br>
-        <small><button id="nextQuestion" style="color:#424242">Volgende</button></small>
-      </div>
-    `;
-
-        // Add event listeners to the buttons for guessing
-        document.querySelectorAll('#options button').forEach(button => {
-            button.addEventListener('click', function() {
-                const isCorrect = this.getAttribute('data-answer') === 'true';
-
-                // Disable all buttons after selection
-                document.querySelectorAll('#options button').forEach(btn => {
-                    btn.disabled = true;  // Disable all buttons after the user clicks one
-                    if (btn.getAttribute('data-answer') === 'true') {
-                        btn.style.backgroundColor = 'green';  // Highlight the correct answer in green
-                    }
-                });
-
-                // Highlight the clicked button
-                if (!isCorrect) {
-                    this.style.backgroundColor = 'red';  // Highlight the wrong answer in red
-                }
-
-                document.querySelector('#nextQuestion').style.color = '#FFFFFF';
-
+    async updateScoreboard(player, score) {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/update_score`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: player, score: score }),
             });
-        });
-        // Add event listener for the Next Question button
-        document.querySelector('#nextQuestion').addEventListener('click', function() {
-            fetchQuotes();  // Fetch a new question
-        });
 
-    } catch (error) {
-        console.error('Error fetching or processing the files:', error);
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            document.querySelector('#score-list').innerHTML = `<p>Cannot update scoreboard :(</p>`;
+            console.error('Error updating scoreboard: ', error);
+        }
+    }
+
+    async getGameStatus() {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/game_status`);
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching game status: ', error);
+        }
+    }
+
+    async startGame(amountOfRounds, roundLength) {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ amountOfRounds: amountOfRounds, roundLength: roundLength }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Error starting game: ', error);
+        }
+    }
+
+    async getRandomQuotes() {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/random_quotes`);
+            const data = await response.json();
+            const randomQuote = data[0];
+            const allOptions = data[1];
+            return [randomQuote, allOptions];
+        } catch (error) {
+            document.querySelector('#app').innerHTML = `<p>Connection to server lost :(</p>`;
+            console.error('Error fetching quotes: ', error);
+        }
+    }
+
+    async getStartTime() {
+        try {
+            const response = await fetch(`${this.SERVER_URL}/start_time`);
+            return await response.json();
+        } catch (error) {
+            console.error('Error getting start time: ', error);
+        }
     }
 }
 
+const api = new Api("http://localhost:3001");
+
+async function updateScoreboard() {
+    if (player === "") {
+        return;
+    }
+    const data = await api.updateScoreboard(player, score);
+    const scoreList = document.querySelector('#score-list');
+    scoreList.innerHTML = '';
+    data.forEach(([player, score]) => {
+      const listItem = document.createElement('li');
+      listItem.textContent = `${player}: ${score} punten`;
+      scoreList.appendChild(listItem);
+    });
+}
+
+async function updateStartTime() {
+    startTime = await api.getStartTime();
+}
+
+function updateRemainingTime() {
+    const elapsedTime = Date.now() - startTime;
+    const remainingTime = 10000 - elapsedTime;
+    const percentage = Math.max(0, (remainingTime / 10000) * 100);
+    document.getElementById('slider').value = percentage;
+}
+
+// Function to fetch and parse the output.ini file
+async function mainLoop() {
+    const gameStarted = await api.getGameStatus();
+    if (!gameStarted) {
+        if (view === View.Game) {
+            enableLobbyView();
+        }
+        return;
+    } else if (view === View.Menu) {
+        return;
+    } else if (view === View.Lobby) {
+        enableGameView();
+    }
+    const [randomQuote, allOptions] = await api.getRandomQuotes();
+    if (currentQuote != null && randomQuote.quote === currentQuote.quote) {
+        return;
+    }
+    await updateStartTime();
+    currentQuote = randomQuote;
+
+    let correctIndex = -1;
+    let selectedIndex = -1;
+    for (let i = 0; i < allOptions.length; i++) {
+        if (allOptions[i] === randomQuote.nonQuote) {
+            correctIndex = i;
+            break;
+        }
+    }
+    // Display the random quote and non-quotes in the HTML
+    document.querySelector('#app').innerHTML = `
+        <h2>"${randomQuote.quote}"</h2>
+        <ul id="options">
+            ${allOptions.map((option, index) => `<li><button id="option-${index}">${option}</button></li>`).join('')}
+        </ul>
+    `;
+
+    document.querySelectorAll('#options button').forEach((button, index) => {
+        button.addEventListener('click', function () {
+            selectedIndex = index;
+            document.querySelectorAll('#options button').forEach(btn => btn.style.backgroundColor = '');
+            this.style.backgroundColor = '#555555';
+        });
+    });
+    function displayAnswerFeedback() {
+        if (selectedIndex === correctIndex) {
+                score += 1;
+        }
+        document.querySelectorAll('#options button').forEach((button, index) => {
+            // Always highlight the correct answer in green
+            if (index === correctIndex) {
+                button.style.backgroundColor = 'green';
+            }
+            // If selected index is incorrect, highlight it in red
+            else if (index === selectedIndex) {
+                button.style.backgroundColor = 'red';
+            }
+
+            // Disable all buttons after feedback is shown
+            button.disabled = true;
+        });
+    }
+    const elapsedTime = Date.now() - startTime;
+    const remainingTime = 10000 - elapsedTime;
+    setTimeout(displayAnswerFeedback, remainingTime);
+}
+
+function clearView() {
+    document.getElementById("app-menu").style.display = "none";
+    document.getElementById("scoreboard").style.display = "none";
+    document.getElementById("lobby").style.display = "none";
+    document.getElementById("slider-container").style.display = "none";
+    document.getElementById("app").style.display = "none";
+    document.getElementById("menu-view").style.display = "none";
+}
+
+function enableLobbyView() {
+    clearView();
+    view = View.Lobby;
+    document.getElementById("app-menu").style.display = "block";
+    document.getElementById("scoreboard").style.display = "block";
+    document.getElementById("lobby").style.display = "block";
+}
+
+document.getElementById("join-game-button").addEventListener("click", function() {
+    // Get the player's name from the input field
+    const playerName = document.getElementById("player-name").value;
+    const serverURL = document.getElementById("server-url").value;
+    if (playerName.trim() !== "") {
+        player = playerName;
+        api.setServerUrl(serverURL);
+        enableLobbyView();
+    } else {
+        alert("Please enter your name to start the game.");
+    }
+});
+
+function enableGameView() {
+    clearView();
+    view = View.Game;
+    document.getElementById("slider-container").style.display = "flex";
+    document.getElementById("app").style.display = "block";
+    document.getElementById("app-menu").style.display = "block";
+    document.getElementById("scoreboard").style.display = "block";
+}
+
+document.getElementById("start-game-button").addEventListener("click", function() {
+    api.startGame(5, 12000);
+});
+
+function enableMenuView() {
+    clearView();
+    view = View.Menu;
+    document.getElementById("menu-view").style.display = "block";
+}
+
+document.getElementById("leave-game-button").addEventListener("click", function() {
+    score = 0;
+    enableMenuView()
+});
+
 // Call the function to fetch and display a random quote and non-quotes
-fetchQuotes();
+setInterval(updateRemainingTime, 10);
+setInterval(updateScoreboard, 100);
+setInterval(mainLoop, 1000);
