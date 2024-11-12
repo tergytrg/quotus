@@ -41,8 +41,24 @@ const quotes = outputLines.map(line => {
 let randomQuote = null;
 let allOptions = null;
 let startTime = Date.now();
+let gameStarted = false;
+let round = 0;
+let maxRound = 0;
+let intervalId = null;
+let scoreboard = new Map();
 
 function pickNewRandomQuote() {
+    console.log(`Picking new set of quotes for round ${round}/${maxRound}`);
+    if (!gameStarted) {
+        return;
+    }
+    round += 1;
+    if (round > maxRound) {
+        clearInterval(intervalId);
+        gameStarted = false;
+        round = 0;
+        maxRound = 0;
+    }
   // Pick a random quote and non-quote combination from output.ini
   const randomQuoteIndex = Math.floor(Math.random() * quotes.length);
   randomQuote = quotes[randomQuoteIndex];
@@ -67,7 +83,6 @@ function pickNewRandomQuote() {
   allOptions.splice(randomPosition, 0, randomQuote.nonQuote);
   startTime = Date.now();
 }
-setInterval(pickNewRandomQuote, 12000);
 
 // GET REQUESTS ==============================================//
 // app.get("/all_quotes", async (req, res) => {
@@ -75,16 +90,36 @@ setInterval(pickNewRandomQuote, 12000);
 // });
 
 app.get("/random_quotes", async (req, res) => {
+    console.log(`Returning  ${[randomQuote, allOptions]}`);
   res.json([randomQuote, allOptions]);
 });
 
 app.get("/start_time", async (req, res) => {
+    console.log(`Returning  ${startTime}`);
   res.json(startTime);
 });
 
-const scoreboard = new Map();
 app.get("/scoreboard", async (req, res) => {
+    console.log(`Returning  ${scoreboard}`);
   res.json(scoreboard);
+});
+
+app.get("/game_status", async (req, res) => {
+    console.log(`Returning  ${gameStarted}`);
+  res.json(gameStarted);
+});
+
+app.post("/start", async (req, res) => {
+    const { amountOfRounds, roundLength } = req.body;
+    if (amountOfRounds === undefined || roundLength === undefined) {
+        return res.status(400).json({ error: "Please provide both amountOfRounds and roundLength." });
+    }
+    gameStarted = true;
+    maxRound = amountOfRounds;
+    pickNewRandomQuote();
+    intervalId = setInterval(pickNewRandomQuote, roundLength);
+    console.log(`Game started with ${maxRound} rounds and ${roundLength} milliseconds!`)
+    res.json(gameStarted);
 });
 
 app.post("/update_score", async (req, res) => {
@@ -96,11 +131,8 @@ app.post("/update_score", async (req, res) => {
   scoreboard.set(name, score);
   const sortedScoreboard = [...scoreboard.entries()]
     .sort((a, b) => b[1] - a[1]);
+  console.log(`Updated scoreboard with user ${name} and score ${score} to return ${sortedScoreboard}`);
   res.json(sortedScoreboard);
-});
-
-app.delete("/reset_score", async (req, res) => {
-  scoreboard.clear();
 });
 
 // POST REQUESTS ==============================================//
